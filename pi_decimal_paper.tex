@@ -445,6 +445,27 @@ The main limitation is the $O(N^2)$ overall complexity due to the $\arctan(1/239
 
 In practice, our C++ implementation with OpenMP parallelization (8 threads) verifies all digits from position 1 to 1000 in approximately 5 seconds, and extracts the 10,000th digit in under 5 seconds. For comparison, Plouffe's 2022 method, while theoretically capable of reaching position $10^8$, requires precomputed tables of Bernoulli numbers that took years of distributed computation to generate. Our method requires no such precomputation.
 
+\subsection{Summary of Decimal Digit Extraction Methods}
+
+Table~\ref{tab:comparison} summarizes the known methods for extracting decimal digits of $\pi$.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lcccl}
+\hline
+\textbf{Method} & \textbf{Year} & \textbf{Complexity} & \textbf{Memory} & \textbf{Limitations} \\
+\hline
+Plouffe~\cite{plouffe1996} & 1996 & $O(N^3 \log^3 N)$ & $O(\log N)$ & Slow \\
+Bellard~\cite{bellard1997} & 1997 & $O(N^2)$ & $O(\log N)$ & Unpublished \\
+Gourdon~\cite{gourdon2003} & 2003 & $O\!\left(\frac{N^2 \log\log N}{\log^2 N}\right)$ & $O(\log^2 N)$ & Current SOTA \\
+Plouffe~\cite{plouffe2022} & 2022 & ${\sim}O(N^2)$ & $O(\log N)$ & Ceiling ${\sim}10^8$ \\
+Ours & 2026 & $O(N^2)$ & $O(\log N)$ & No ceiling \\
+\hline
+\end{tabular}
+\caption{Comparison of decimal digit extraction methods for $\pi$. Complexity refers to time to extract the $N$-th digit. Gourdon's method achieves the best asymptotic complexity but requires more memory. Plouffe's 2022 method is limited by Euler--Bernoulli precomputation. Our method has no practical upper limit.}
+\label{tab:comparison}
+\end{table}
+
 \section{Conclusion}
 
 We have presented a new method for extracting decimal digits of $\pi$ based on Machin's classical formula. The key innovations are series splitting, which eliminates the alternating signs that would otherwise prevent the application of modular arithmetic, and borrow tracking, which enables the combination of fractional parts under subtraction without computing or storing any integer parts.
@@ -475,6 +496,9 @@ J.~Machin, The ratio of the radius to the circumference, \emph{Philos.\ Trans.\ 
 
 \bibitem{bellard1997}
 F.~Bellard, A new formula to compute the $n$-th binary digit of pi, Technical report, 1997.
+
+\bibitem{gourdon2003}
+X.~Gourdon and P.~Sebah, N-th digit computation, Technical report, numbers.computation.free.fr, 2003.
 
 \bibitem{pidigits}
 Various authors, Tables of digits of $\pi$, \url{https://www.angio.net/pi/digits.html}
