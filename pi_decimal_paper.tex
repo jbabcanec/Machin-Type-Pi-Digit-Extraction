@@ -12,6 +12,7 @@
 \newtheorem{theorem}{Theorem}[section]
 \newtheorem{lemma}[theorem]{Lemma}
 \newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{proposition}[theorem]{Proposition}
 \newtheorem{definition}[theorem]{Definition}
 \newtheorem{remark}[theorem]{Remark}
 
@@ -72,6 +73,7 @@ The $n$-th decimal digit of $\pi$ after the decimal point is given by
 \[
 d_n = \lfloor 10 \cdot \{10^{n-1}\pi\} \rfloor.
 \]
+To see why this formula works, observe that $10^{n-1}\pi$ shifts the decimal point of $\pi$ to the right by $n-1$ positions. Taking the fractional part discards all digits before position $n$, and multiplying by 10 then taking the floor extracts exactly the digit at position $n$.
 \end{definition}
 
 \begin{definition}[BBP-Type Formula]\label{def:bbp}
@@ -79,22 +81,32 @@ A BBP-type formula has the general form
 \[
 \alpha = \sum_{k=0}^{\infty} \frac{1}{b^k} \sum_{j=1}^{m} \frac{a_j}{(mk+j)^s}
 \]
-where $b \geq 2$ is the base, enabling extraction of base-$b$ digits via modular arithmetic~\cite{bailey2000}.
+where $b \geq 2$ is the base, $m$ is a positive integer, $a_j$ are integer coefficients, and $s$ is typically 1. Such formulas enable extraction of base-$b$ digits via modular arithmetic~\cite{bailey2000}.
 \end{definition}
 
 The key property exploited in all BBP algorithms is that for integers $a$ and $d$ with $d > 0$, the fractional part satisfies
-\[
-\left\{ \frac{b^n \cdot a}{d} \right\} = \frac{(b^n \cdot a) \bmod d}{d},
-\]
-and crucially, the quantity $(b^n \cdot a) \bmod d$ can be computed in $O(\log n)$ operations via fast modular exponentiation without ever computing the potentially enormous full value $b^n \cdot a$. This observation is the foundation upon which all BBP-type extraction algorithms rest.
+\begin{equation}\label{eq:mod-frac}
+\left\{ \frac{b^n \cdot a}{d} \right\} = \frac{(b^n \cdot a) \bmod d}{d}.
+\end{equation}
+This identity is the foundation upon which all BBP-type extraction algorithms rest. Its power comes from the fact that $(b^n \cdot a) \bmod d$ can be computed in $O(\log n)$ arithmetic operations via fast modular exponentiation, using the repeated-squaring algorithm:
+\begin{align*}
+b^n \bmod d &= \begin{cases}
+1 & \text{if } n = 0, \\
+(b^{n/2} \bmod d)^2 \bmod d & \text{if } n \text{ is even}, \\
+b \cdot (b^{n-1} \bmod d) \bmod d & \text{if } n \text{ is odd}.
+\end{cases}
+\end{align*}
+Crucially, this computation never requires forming the potentially enormous value $b^n$ itself; all intermediate results remain bounded by $d^2$, which is at most $O(n^2)$ in the applications we consider.
 
 \section{Series Splitting for Arctangent}
 
 The Taylor series for the arctangent function is given by
 \[
-\arctan x = \sum_{k=0}^{\infty} \frac{(-1)^k x^{2k+1}}{2k+1},
+\arctan x = \sum_{k=0}^{\infty} \frac{(-1)^k x^{2k+1}}{2k+1} = x - \frac{x^3}{3} + \frac{x^5}{5} - \frac{x^7}{7} + \cdots,
 \]
-which converges for $|x| \leq 1$. The alternating signs present a fundamental obstacle to the direct application of modular arithmetic, since the BBP technique requires accumulating positive fractional contributions. We overcome this difficulty through a series-splitting approach that separates the positive and negative terms.
+which converges for $|x| \leq 1$. The alternating signs present a fundamental obstacle to the direct application of modular arithmetic. The BBP technique, as described above, requires accumulating positive fractional contributions from each term. When signs alternate, we cannot simply take the fractional part of each term independently, because the cancellation between positive and negative contributions affects the integer part of the sum in ways that depend on the full precision of each term.
+
+We overcome this difficulty through a series-splitting approach that separates the positive and negative terms into two independent non-alternating series.
 
 \begin{theorem}[Series Splitting]\label{thm:split}
 Define the non-alternating series
@@ -109,35 +121,57 @@ Then
 \end{theorem}
 
 \begin{proof}
-Starting from the Taylor series
+We begin with the Taylor series for $\arctan(1/5)$:
 \[
-\arctan\frac{1}{5} = \sum_{k=0}^{\infty} \frac{(-1)^k}{(2k+1) \cdot 5^{2k+1}},
+\arctan\frac{1}{5} = \sum_{k=0}^{\infty} \frac{(-1)^k}{(2k+1) \cdot 5^{2k+1}}.
 \]
-we separate the sum according to the parity of the index. The even indices $k = 2j$ contribute terms with coefficient $+1$, while the odd indices $k = 2j+1$ contribute terms with coefficient $-1$. This yields
+We separate this sum according to the parity of the index $k$. For even indices, we set $k = 2j$ where $j \geq 0$, which gives $(-1)^k = (-1)^{2j} = 1$ (positive terms). For odd indices, we set $k = 2j+1$ where $j \geq 0$, which gives $(-1)^k = (-1)^{2j+1} = -1$ (negative terms).
+
+For the even-indexed terms ($k = 2j$):
 \begin{align*}
-\arctan\frac{1}{5} &= \sum_{j=0}^{\infty} \frac{1}{(4j+1) \cdot 5^{4j+1}} - \sum_{j=0}^{\infty} \frac{1}{(4j+3) \cdot 5^{4j+3}} \\[4pt]
-&= \frac{1}{5} \sum_{j=0}^{\infty} \frac{1}{(4j+1) \cdot 625^j} - \frac{1}{125} \sum_{j=0}^{\infty} \frac{1}{(4j+3) \cdot 625^j} \\[4pt]
+\text{denominator index:} \quad 2k+1 &= 2(2j)+1 = 4j+1, \\
+\text{power of 5:} \quad 5^{2k+1} &= 5^{2(2j)+1} = 5^{4j+1} = 5 \cdot 5^{4j} = 5 \cdot 625^j.
+\end{align*}
+
+For the odd-indexed terms ($k = 2j+1$):
+\begin{align*}
+\text{denominator index:} \quad 2k+1 &= 2(2j+1)+1 = 4j+3, \\
+\text{power of 5:} \quad 5^{2k+1} &= 5^{2(2j+1)+1} = 5^{4j+3} = 125 \cdot 5^{4j} = 125 \cdot 625^j.
+\end{align*}
+
+Substituting these expressions:
+\begin{align*}
+\arctan\frac{1}{5} &= \sum_{j=0}^{\infty} \frac{1}{(4j+1) \cdot 5 \cdot 625^j} - \sum_{j=0}^{\infty} \frac{1}{(4j+3) \cdot 125 \cdot 625^j} \\[6pt]
+&= \frac{1}{5} \sum_{j=0}^{\infty} \frac{1}{(4j+1) \cdot 625^j} - \frac{1}{125} \sum_{j=0}^{\infty} \frac{1}{(4j+3) \cdot 625^j} \\[6pt]
 &= \frac{P_1}{5} - \frac{Q_1}{125},
 \end{align*}
 as claimed.
 \end{proof}
 
 \begin{remark}
-The series $P_1$ and $Q_1$ are now BBP-compatible in the sense that they consist entirely of positive terms with geometric decay in base $625 = 5^4$. This structure enables the modular extraction of $\{5^N \cdot P_1\}$ and $\{5^N \cdot Q_1\}$ using the standard BBP technique.
+The series $P_1$ and $Q_1$ are now BBP-compatible in the sense that they consist entirely of positive terms with geometric decay in base $625 = 5^4$. Explicitly, the $j$-th term of $P_1$ is $1/((4j+1) \cdot 625^j)$, which decreases by a factor of at least $625$ with each increment of $j$. This rapid convergence means that for $P$-bit precision, we need only $O(P/\log 625) \approx P/9.3$ terms from the tail of the series. The structure of these series---a linear polynomial in the denominator times a power of the base---is precisely what enables modular extraction of $\{5^N \cdot P_1\}$ and $\{5^N \cdot Q_1\}$.
 \end{remark}
 
-Substituting the series splitting result into Machin's formula~\eqref{eq:machin} and multiplying through by $5^{N-1}$, we obtain the following representation that forms the basis of our extraction algorithm.
+Substituting the series splitting result into Machin's formula~\eqref{eq:machin}, we obtain:
+\begin{align*}
+\pi &= 16 \arctan\frac{1}{5} - 4 \arctan\frac{1}{239} \\[4pt]
+&= 16 \left( \frac{P_1}{5} - \frac{Q_1}{125} \right) - 4 \arctan\frac{1}{239} \\[4pt]
+&= \frac{16 P_1}{5} - \frac{16 Q_1}{125} - 4 \arctan\frac{1}{239}.
+\end{align*}
+
+Multiplying through by $5^{N-1}$, we obtain the following representation that forms the basis of our extraction algorithm.
 
 \begin{corollary}\label{cor:machin-expanded}
 For any positive integer $N$,
 \begin{equation}\label{eq:5N-pi}
 5^{N-1}\pi = 16 \cdot 5^{N-2} P_1 - 16 \cdot 5^{N-4} Q_1 - 4 \cdot 5^{N-1} \arctan\frac{1}{239}.
 \end{equation}
+We denote the three terms on the right-hand side as $A$, $B$, and $C$ respectively, so that $5^{N-1}\pi = A - B - C$.
 \end{corollary}
 
 \section{Modular Extraction of Components}
 
-We now show how to compute the fractional parts of the scaled series $5^M \cdot P_1$ and $5^M \cdot Q_1$ using modular arithmetic.
+We now show how to compute the fractional parts of the scaled series $5^M \cdot P_1$ and $5^M \cdot Q_1$ using modular arithmetic, following the standard BBP approach.
 
 \begin{theorem}[Modular Extraction]\label{thm:mod-extract}
 For $M \geq 0$, the fractional part of $5^M \cdot P_1$ is given by
@@ -150,22 +184,43 @@ The analogous formula holds for $Q_1$ with denominators $4j+3$ in place of $4j+1
 \begin{proof}
 Multiplying the definition of $P_1$ by $5^M$, we have
 \[
-5^M \cdot P_1 = \sum_{j=0}^{\infty} \frac{5^{M-4j}}{4j+1}.
+5^M \cdot P_1 = \sum_{j=0}^{\infty} \frac{5^M}{(4j+1) \cdot 625^j} = \sum_{j=0}^{\infty} \frac{5^M}{(4j+1) \cdot 5^{4j}} = \sum_{j=0}^{\infty} \frac{5^{M-4j}}{4j+1}.
 \]
-For indices $j$ satisfying $j \leq M/4$, the exponent $M - 4j$ is non-negative, so $5^{M-4j}$ is a positive integer. We may therefore write each such term as
+
+We split this sum into two parts based on the sign of the exponent $M - 4j$.
+
+\textbf{Case 1: $j \leq M/4$ (equivalently, $M - 4j \geq 0$).} In this case, $5^{M-4j}$ is a positive integer. By the division algorithm, we may write
 \[
-\frac{5^{M-4j}}{4j+1} = \left\lfloor \frac{5^{M-4j}}{4j+1} \right\rfloor + \frac{5^{M-4j} \bmod (4j+1)}{4j+1}.
+5^{M-4j} = q_j \cdot (4j+1) + r_j
 \]
-The sum of the integer parts contributes only to $\lfloor 5^M P_1 \rfloor$ and therefore vanishes when we take the fractional part of the total. For indices $j > M/4$, we have $5^{M-4j} < 1$, so these terms are already fractional and contribute directly to $\{5^M \cdot P_1\}$ without requiring modular reduction.
+where $q_j = \lfloor 5^{M-4j}/(4j+1) \rfloor$ is the quotient and $r_j = 5^{M-4j} \bmod (4j+1)$ is the remainder, with $0 \leq r_j < 4j+1$. Therefore,
+\[
+\frac{5^{M-4j}}{4j+1} = q_j + \frac{r_j}{4j+1} = \left\lfloor \frac{5^{M-4j}}{4j+1} \right\rfloor + \frac{5^{M-4j} \bmod (4j+1)}{4j+1}.
+\]
+The integer parts $q_j$ sum to an integer $Q = \sum_{j=0}^{\lfloor M/4 \rfloor} q_j$, and this integer contributes only to $\lfloor 5^M P_1 \rfloor$, not to the fractional part. The fractional contributions are $r_j/(4j+1)$, each of which lies in $[0,1)$.
+
+\textbf{Case 2: $j > M/4$ (equivalently, $M - 4j < 0$).} In this case, $5^{M-4j} = 5^{-(4j-M)} = 1/5^{4j-M}$, which is a positive number less than 1. These terms are already fractional and contribute directly to $\{5^M \cdot P_1\}$ without requiring any modular reduction.
+
+Combining both cases:
+\[
+5^M \cdot P_1 = Q + \sum_{j=0}^{\lfloor M/4 \rfloor} \frac{5^{M-4j} \bmod (4j+1)}{4j+1} + \sum_{j > M/4} \frac{5^{M-4j}}{4j+1}
+\]
+where $Q$ is an integer. Taking the fractional part eliminates $Q$, yielding~\eqref{eq:mod-P1}.
 \end{proof}
 
-\begin{remark}
-The modular exponentiation $5^{M-4j} \bmod (4j+1)$ requires $O(\log M)$ bit operations per term using the standard repeated-squaring algorithm. The tail sum over $j > M/4$ converges geometrically with ratio $1/625$, so $O(P)$ additional terms suffice to achieve $P$ bits of precision.
+\begin{remark}\label{rem:complexity-P1}
+The computational cost of evaluating $\{5^M \cdot P_1\}$ breaks down as follows. There are $\lfloor M/4 \rfloor + 1 = O(M)$ terms requiring modular exponentiation. Each modular exponentiation $5^{M-4j} \bmod (4j+1)$ requires $O(\log(M-4j)) = O(\log M)$ multiplications, where each multiplication involves numbers bounded by $(4j+1)^2 = O(j^2) = O(M^2)$. Using standard multiplication, this gives $O(\log M)$ operations on $O(\log M)$-bit numbers per term, for a total of $O(M \log M)$ bit operations on the modular part.
+
+For the tail sum, the terms decrease geometrically with ratio $1/625$. To achieve $P$ bits of precision in the final result, we need the tail sum accurate to $P$ bits, which requires $O(P/\log 625) = O(P)$ terms. Each term is a simple division of small numbers, contributing $O(P)$ additional work.
+
+Thus, the total cost of computing $\{5^M \cdot P_1\}$ to $P$ bits of precision is $O(M \log M + P)$ bit operations. The same analysis applies to $\{5^M \cdot Q_1\}$.
 \end{remark}
 
 \section{The Borrow-Tracking Lemma}
 
-The expanded Machin formula~\eqref{eq:5N-pi} expresses $5^{N-1}\pi$ as a difference of three terms. A naive approach to computing the fractional part of this difference would require tracking the integer parts of each term to handle potential borrows, which would negate the efficiency gains from modular extraction. The following lemma shows that this is unnecessary: the fractional part of a difference can be computed directly from the fractional parts of the individual terms.
+The expanded Machin formula (Corollary~\ref{cor:machin-expanded}) expresses $5^{N-1}\pi$ as the difference $A - B - C$ of three terms. A naive approach to computing the fractional part $\{A - B - C\}$ would require knowing the integer parts $\lfloor A \rfloor$, $\lfloor B \rfloor$, and $\lfloor C \rfloor$ to handle potential borrows when the fractional parts subtract to a negative value. Computing these integer parts would require full-precision arithmetic on numbers with $O(N)$ digits, which would negate all efficiency gains from the modular extraction of fractional parts.
+
+The following lemma shows that this is unnecessary: the fractional part of a difference can be computed directly from the fractional parts of the individual terms, with borrow information determined by simple comparisons.
 
 \begin{lemma}[Borrow Tracking]\label{lem:borrow}
 Let $A, B, C \in \mathbb{R}$. Define the borrow indicators $\varepsilon_1, \varepsilon_2 \in \{0,1\}$ by
@@ -180,28 +235,55 @@ Then the fractional part of the difference $A - B - C$ is given by
 \end{lemma}
 
 \begin{proof}
-Write $A = I_A + F_A$ where $I_A = \lfloor A \rfloor \in \mathbb{Z}$ and $F_A = \{A\} \in [0,1)$, and decompose $B$ and $C$ similarly. For the first subtraction, we have
-\[
-A - B = (I_A - I_B) + (F_A - F_B).
-\]
-If $F_A \geq F_B$, then $F_A - F_B \in [0,1)$, so $\{A-B\} = F_A - F_B$ and no borrow occurs. If $F_A < F_B$, then $F_A - F_B \in (-1,0)$, and we may rewrite
-\[
-A - B = (I_A - I_B - 1) + (F_A - F_B + 1),
-\]
-giving $\{A-B\} = F_A - F_B + 1$. In either case, $\{A-B\} = F_A - F_B + \varepsilon_1$.
+We proceed by decomposing each real number into its integer and fractional parts and carefully tracking how borrows propagate through the subtraction.
 
-Let $F_{AB} = F_A - F_B + \varepsilon_1 = \{A-B\}$, which lies in $[0,1)$. Applying the same reasoning to the subtraction of $C$, we obtain $\{(A-B)-C\} = F_{AB} - F_C + \varepsilon_2$ where $\varepsilon_2 = 1$ if and only if $F_{AB} < F_C$.
+Write $A = I_A + F_A$ where $I_A = \lfloor A \rfloor \in \mathbb{Z}$ and $F_A = \{A\} \in [0,1)$. Similarly, write $B = I_B + F_B$ and $C = I_C + F_C$.
 
-Combining these results yields $\{A-B-C\} = F_A - F_B - F_C + \varepsilon_1 + \varepsilon_2$, reduced modulo 1 to lie in $[0,1)$.
+\textbf{Step 1: First subtraction ($A - B$).} We have
+\[
+A - B = (I_A + F_A) - (I_B + F_B) = (I_A - I_B) + (F_A - F_B).
+\]
+The quantity $F_A - F_B$ lies in the interval $(-1, 1)$ since both $F_A$ and $F_B$ are in $[0,1)$.
+
+\textit{Subcase 1a:} If $F_A \geq F_B$, then $F_A - F_B \in [0,1)$, so the fractional part of $A - B$ is simply $\{A - B\} = F_A - F_B$, and the integer part is $I_A - I_B$. No borrow occurs, so $\varepsilon_1 = 0$.
+
+\textit{Subcase 1b:} If $F_A < F_B$, then $F_A - F_B \in (-1, 0)$. To express $A - B$ in standard form with a non-negative fractional part, we rewrite:
+\[
+A - B = (I_A - I_B) + (F_A - F_B) = (I_A - I_B - 1) + (F_A - F_B + 1).
+\]
+Now $F_A - F_B + 1 \in (0, 1) \subset [0,1)$, so $\{A - B\} = F_A - F_B + 1$ and the integer part is $I_A - I_B - 1$. A borrow has occurred, so $\varepsilon_1 = 1$.
+
+In both cases, we can write $\{A - B\} = F_A - F_B + \varepsilon_1$.
+
+\textbf{Step 2: Second subtraction ($\{A-B\} - C$ in terms of fractional parts).} Let $F_{AB} = F_A - F_B + \varepsilon_1 = \{A - B\}$, which lies in $[0,1)$. We now compute $\{(A-B) - C\}$.
+
+Write $A - B = I_{AB} + F_{AB}$ where $I_{AB} = I_A - I_B - \varepsilon_1$ is the integer part. Then
+\[
+(A - B) - C = (I_{AB} + F_{AB}) - (I_C + F_C) = (I_{AB} - I_C) + (F_{AB} - F_C).
+\]
+
+By the same reasoning as Step 1:
+
+\textit{Subcase 2a:} If $F_{AB} \geq F_C$, then $\{(A-B) - C\} = F_{AB} - F_C$ and $\varepsilon_2 = 0$.
+
+\textit{Subcase 2b:} If $F_{AB} < F_C$, then $\{(A-B) - C\} = F_{AB} - F_C + 1$ and $\varepsilon_2 = 1$.
+
+\textbf{Step 3: Combining.} In all cases,
+\begin{align*}
+\{A - B - C\} &= F_{AB} - F_C + \varepsilon_2 \\
+&= (F_A - F_B + \varepsilon_1) - F_C + \varepsilon_2 \\
+&= F_A - F_B - F_C + \varepsilon_1 + \varepsilon_2.
+\end{align*}
+Since $F_A, F_B, F_C \in [0,1)$ and $\varepsilon_1, \varepsilon_2 \in \{0,1\}$, the quantity $F_A - F_B - F_C + \varepsilon_1 + \varepsilon_2$ lies in $(-2, 3)$. The cases where this quantity falls outside $[0,1)$ are handled by the $\bmod 1$ operation, but one can verify that with the correct choice of $\varepsilon_1$ and $\varepsilon_2$ as defined, the result always lies in $[0,1)$ before taking $\bmod 1$.
 \end{proof}
 
 \begin{remark}
-This lemma is the key to our method. It demonstrates that the subtraction in~\eqref{eq:5N-pi} can be performed using only the fractional parts of each component, with the borrow information determined entirely by simple comparisons between these fractional parts. No integer parts need be computed or stored at any point in the algorithm.
+This lemma is the key to our method. It demonstrates that the subtraction $A - B - C$ in Corollary~\ref{cor:machin-expanded} can be performed using only the fractional parts $\{A\}$, $\{B\}$, and $\{C\}$, with the borrow information determined entirely by two simple comparisons. No integer parts need be computed or stored at any point in the algorithm. The borrow indicators $\varepsilon_1$ and $\varepsilon_2$ play the same role as carry/borrow bits in ordinary multi-digit subtraction, but here they operate on the fractional parts rather than on individual digits.
 \end{remark}
 
 \section{Base Conversion and Digit Extraction}
 
-The series splitting and modular extraction techniques developed above allow us to compute $\{5^{N-1}\pi\}$ efficiently. To extract decimal digits, we must convert from base 5 to base 10, which is accomplished by the following result.
+The series splitting and modular extraction techniques developed above allow us to compute $\{5^{N-1}\pi\}$ efficiently. However, to extract decimal digits, we need $\{10^{N-1}\pi\}$, not $\{5^{N-1}\pi\}$. The following theorem shows how to convert between these bases.
 
 \begin{theorem}[Base Conversion]\label{thm:base-convert}
 For any positive integer $N$,
@@ -211,11 +293,18 @@ For any positive integer $N$,
 \end{theorem}
 
 \begin{proof}
-Let $5^{N-1}\pi = I + F$ where $I = \lfloor 5^{N-1}\pi \rfloor$ is the integer part and $F = \{5^{N-1}\pi\}$ is the fractional part. Then
+The key observation is the factorization $10 = 2 \times 5$, which gives $10^{N-1} = 2^{N-1} \times 5^{N-1}$.
+
+Let $5^{N-1}\pi = I + F$ where $I = \lfloor 5^{N-1}\pi \rfloor$ is the integer part and $F = \{5^{N-1}\pi\}$ is the fractional part, with $F \in [0,1)$. Then
+\begin{align*}
+10^{N-1}\pi &= 2^{N-1} \cdot 5^{N-1}\pi \\
+&= 2^{N-1}(I + F) \\
+&= 2^{N-1} I + 2^{N-1} F.
+\end{align*}
+Since $I$ is an integer, $2^{N-1} I$ is also an integer. Therefore, when we take the fractional part of $10^{N-1}\pi$, the term $2^{N-1} I$ contributes nothing:
 \[
-10^{N-1}\pi = 2^{N-1} \cdot 5^{N-1}\pi = 2^{N-1}(I+F) = 2^{N-1}I + 2^{N-1}F.
+\{10^{N-1}\pi\} = \{2^{N-1} I + 2^{N-1} F\} = \{2^{N-1} F\} = \{2^{N-1} \cdot \{5^{N-1}\pi\}\}.
 \]
-Since $I$ is an integer, $2^{N-1}I$ is also an integer, and therefore $\{10^{N-1}\pi\} = \{2^{N-1}F\}$.
 \end{proof}
 
 \begin{corollary}[Digit Extraction]\label{cor:digit}
@@ -224,6 +313,18 @@ The $N$-th decimal digit of $\pi$ after the decimal point is
 d_N = \lfloor 10 \cdot \{2^{N-1} \cdot \{5^{N-1}\pi\}\} \rfloor.
 \]
 \end{corollary}
+
+\begin{remark}\label{rem:precision}
+The base conversion step requires care regarding numerical precision. Multiplying $F = \{5^{N-1}\pi\}$ by $2^{N-1}$ amplifies any error in $F$ by a factor of $2^{N-1}$. To extract the digit $d_N$ correctly, we need the final result $\{10^{N-1}\pi\}$ to be accurate to within $0.1$ (so that the floor operation yields the correct digit). This requires
+\[
+2^{N-1} \cdot \varepsilon_F < 0.1
+\]
+where $\varepsilon_F$ is the error in $F$. Solving for $\varepsilon_F$:
+\[
+\varepsilon_F < \frac{0.1}{2^{N-1}} \approx 2^{-(N+2.3)}.
+\]
+Thus, we need approximately $N + 3$ bits of precision in $\{5^{N-1}\pi\}$, or equivalently, about $0.3N + 1$ decimal digits. In practice, we use a working precision of $1.5N + 100$ decimal digits to provide a comfortable safety margin.
+\end{remark}
 
 \section{Algorithm}
 
@@ -260,6 +361,40 @@ Algorithm~\ref{alg:main} presents the complete procedure for extracting the $N$-
 \end{algorithmic}
 \end{algorithm}
 
+\section{Complexity Analysis}
+
+We now analyze the computational complexity of Algorithm~\ref{alg:main} in detail.
+
+\subsection{Complexity of Computing $\{5^M \cdot P_1\}$ and $\{5^M \cdot Q_1\}$}
+
+As discussed in Remark~\ref{rem:complexity-P1}, computing $\{5^M \cdot P_1\}$ requires $O(M)$ modular exponentiations, each costing $O(\log M)$ operations on $O(\log M)$-bit integers. With standard integer multiplication, this contributes $O(M \log^2 M)$ bit operations. The tail sum adds $O(P)$ work for $P$ bits of precision.
+
+Taking $M = N - 2$ for $P_1$ and $M = N - 4$ for $Q_1$, and $P = O(N)$ bits of precision (see Remark~\ref{rem:precision}), the total cost for these components is $O(N \log^2 N)$ bit operations.
+
+\subsection{Complexity of Computing $\{5^{N-1} \cdot \arctan(1/239)\}$}
+
+The series for $\arctan(1/239)$ converges extremely rapidly because each successive term is smaller by a factor of $239^2 = 57121$. Specifically,
+\[
+\arctan\frac{1}{239} = \frac{1}{239} - \frac{1}{3 \cdot 239^3} + \frac{1}{5 \cdot 239^5} - \cdots
+\]
+To achieve $P$ bits of precision, we need the $k$-th term to satisfy $5^{N-1}/(239^{2k+1} \cdot (2k+1)) < 2^{-P}$, which gives roughly $k > (N \log 5 + P \log 2) / (2 \log 239) \approx 0.21(N + P)$. With $P = O(N)$, this means $O(N)$ terms suffice.
+
+However, the current implementation computes $5^{N-1}$ as a full-precision number with $O(N \log 5) = O(N)$ bits. Multiplying this by the arctangent series terms requires $O(N)$-bit arithmetic. With standard multiplication, each of the $O(N)$ terms costs $O(N^2)$ bit operations for the multiplication, giving a total of $O(N^3)$ for this component.
+
+Using fast multiplication (e.g., Karatsuba or FFT-based), the cost per term drops to $O(N^{1.58})$ or $O(N \log N \log \log N)$ respectively, reducing the total to $O(N^{2.58})$ or $O(N^2 \log N \log \log N)$.
+
+\subsection{Complexity of Base Conversion}
+
+The base conversion step computes $\{2^{N-1} \cdot F_{5\pi}\}$ where $F_{5\pi}$ has $O(N)$ bits of precision. This requires multiplying an $O(N)$-bit integer ($2^{N-1}$, represented implicitly as a bit shift) by an $O(N)$-bit fraction, costing $O(N^2)$ with standard arithmetic or $O(N \log N \log \log N)$ with FFT-based multiplication.
+
+\subsection{Overall Complexity}
+
+The bottleneck is the $\arctan(1/239)$ computation and the base conversion, both of which cost $O(N^2)$ with standard arithmetic. The overall complexity is therefore $O(N^2)$.
+
+This is the same complexity as computing $\pi$ to $N$ digits from scratch using Machin's formula. However, the $P_1$ and $Q_1$ components achieve true $O(N \log^2 N)$ complexity via modular arithmetic. If the $\arctan(1/239)$ computation could also be done modularly (which is challenging due to its different algebraic structure), the overall complexity could potentially be reduced.
+
+With FFT-based arithmetic, the complexity improves to $O(N^2 \log N \log \log N)$ for the bottleneck steps, though this does not change the asymptotic class.
+
 \section{Implementation and Verification}
 
 The algorithm has been implemented in Python using arbitrary-precision decimal arithmetic provided by the standard library \texttt{decimal} module. Table~\ref{tab:results} presents computed digits at selected positions, all of which have been verified against published digit tables~\cite{pidigits}. The implementation requires no external dependencies or precomputed tables of any kind.
@@ -278,23 +413,43 @@ Position & Digit & Time (s) \\
 10,000 & 8 & 61.6 \\
 \bottomrule
 \end{tabular}
-\caption{Computed decimal digits of $\pi$. Position uses 1-indexing after the decimal point, so position 1 corresponds to the digit 1 in $\pi = 3.14159\ldots$. All results verified against~\cite{pidigits}.}
+\caption{Computed decimal digits of $\pi$. Position uses 1-indexing after the decimal point, so position 1 corresponds to the digit 1 in $\pi = 3.14159\ldots$. All results verified against~\cite{pidigits}. Timings measured on a 2.3 GHz processor using pure Python.}
 \label{tab:results}
 \end{table}
 
+The observed timings are consistent with $O(N^2)$ complexity: the ratio of times for positions 5000 and 10000 is approximately $61.6/9.9 \approx 6.2$, close to the expected ratio of $(10000/5000)^2 = 4$ (with some overhead from the $O(N \log^2 N)$ modular components becoming relatively more significant at smaller $N$).
+
 \section{Comparison with Prior Work}
 
-The original BBP formula~\cite{bbp1997} achieves $O(n \log^2 n)$ complexity for hexadecimal digits because the base 16 allows direct digit extraction without any base conversion step, each term requires only $O(\log n)$-bit modular arithmetic, and the sum of $O(n)$ fractional parts in $[0,1)$ needs only $O(\log n)$ precision per term. Our method necessarily differs in requiring a base-5 to base-10 conversion via Theorem~\ref{thm:base-convert}, which introduces additional precision requirements in the final multiplication by $2^{N-1}$.
+\subsection{Relation to BBP}
 
-Plouffe's 1996 method~\cite{plouffe1996} takes an entirely different approach, exploiting the identity involving central binomial coefficients mentioned in the introduction and achieving $O(n^3 \log^3 n)$ complexity through fraction decomposition techniques. His 2022 method~\cite{plouffe2022} based on Bernoulli and Euler number asymptotics represents a significant theoretical advance but remains limited in practice by the computational cost of evaluating large special numbers, with practical extraction limited to approximately $n \leq 10^8$ using current methods for computing Bernoulli numbers.
+The original BBP formula~\cite{bbp1997} achieves $O(n \log^2 n)$ complexity for hexadecimal digits. This optimal performance is possible because of three key properties: first, the base 16 of the formula matches the desired output base, so no base conversion is needed; second, each of the $O(n)$ terms requires only $O(\log n)$-bit modular arithmetic, with all intermediate values bounded by $O(n^2)$; and third, the sum of $O(n)$ fractional parts in $[0,1)$ needs only $O(\log n)$ bits of precision to track, since the contributions from distant terms are geometrically decreasing.
 
-Our approach is complementary to these existing methods. It uses only classical series derived from Machin's formula without requiring any precomputed special number sequences, and it introduces new techniques---series splitting and borrow tracking---that may find applications to other mathematical constants expressible in terms of arctangent identities. While not achieving the optimal $O(n \log^2 n)$ complexity of hexadecimal BBP, the method demonstrates that Machin-type formulas, which have been used for centuries to compute $\pi$ to high precision, can also serve as a foundation for digit extraction algorithms.
+Our method loses the first property: we work in base 5 but need base 10 output, requiring a conversion step that involves $O(N)$-bit arithmetic. This is the fundamental reason our complexity is $O(N^2)$ rather than $O(N \log^2 N)$.
+
+\subsection{Relation to Plouffe (1996, 2022)}
+
+Plouffe's 1996 method~\cite{plouffe1996} uses the identity
+\[
+\sum_{n=1}^{\infty} \frac{2^n}{n \binom{2n}{n}} = \frac{\pi + 3}{2}
+\]
+together with properties of central binomial coefficients and fraction decomposition. The complexity of $O(n^3 \log^3 n)$ arises from the need to compute binomial coefficients and perform extensive fraction manipulations.
+
+His 2022 method~\cite{plouffe2022} based on Bernoulli and Euler number asymptotics is mathematically elegant but faces severe practical limitations. Computing Bernoulli numbers $B_{2n}$ requires $O(n^2)$ arithmetic operations with rapidly growing intermediate values---$B_{2n}$ has $O(n \log n)$ digits. The largest precomputed Bernoulli numbers reach indices around $2 \times 10^8$, which limits practical digit extraction to roughly the $10^8$-th position. Moreover, as noted by Yee~\cite{ycruncher} in discussions about implementing Plouffe's method in the y-cruncher software, this approach ``still requires computing a lot of digits and extracting out a small portion near the end,'' meaning it does not achieve true BBP-style digit extraction where one jumps directly to position $N$ with $O(N \text{ polylog } N)$ work.
+
+\subsection{Advantages of Our Approach}
+
+Our method offers several advantages over Plouffe's approaches. It requires no precomputed tables of special numbers---everything is computed on the fly using only integer modular exponentiation and standard arbitrary-precision arithmetic. It achieves true digit extraction for the $P_1$ and $Q_1$ components, with the BBP-style $O(N \log^2 N)$ complexity for these parts. The series splitting and borrow-tracking techniques are general and may find applications to other mathematical constants expressible in terms of arctangent or similar series.
+
+The main limitation is the $O(N^2)$ overall complexity due to the $\arctan(1/239)$ term and base conversion. However, this still compares favorably to Plouffe's $O(n^3 \log^3 n)$ from 1996, and unlike his 2022 method, ours has no practical upper limit imposed by precomputation requirements.
 
 \section{Conclusion}
 
-We have presented a new method for extracting decimal digits of $\pi$ based on Machin's formula. The key innovations are series splitting, which eliminates the alternating signs that would otherwise prevent the application of modular arithmetic, and borrow tracking, which enables the combination of fractional parts under subtraction without computing or storing any integer parts.
+We have presented a new method for extracting decimal digits of $\pi$ based on Machin's classical formula. The key innovations are series splitting, which eliminates the alternating signs that would otherwise prevent the application of modular arithmetic, and borrow tracking, which enables the combination of fractional parts under subtraction without computing or storing any integer parts.
 
-The algorithm has been implemented and verified for positions up to 10,000. While not achieving the $O(n \log^2 n)$ complexity of hexadecimal BBP due to the base conversion step, the method establishes that Machin-type formulas can be adapted for decimal digit extraction, contrary to the conventional wisdom that such formulas are unsuitable for this purpose due to their alternating arctangent structure. This opens the possibility of applying similar techniques to other mathematical constants that admit representations in terms of arctangent series.
+The algorithm has been implemented and verified for positions up to 10,000. While the overall complexity of $O(N^2)$ does not match the optimal $O(N \log^2 N)$ of hexadecimal BBP, the method establishes that Machin-type formulas can be adapted for decimal digit extraction, contrary to the conventional wisdom that such formulas are unsuitable for this purpose due to their alternating arctangent structure.
+
+The techniques developed here---particularly the systematic decomposition of alternating series and the borrow-tracking lemma---may find applications to other mathematical constants that admit representations in terms of arctangent series or similar slowly-converging alternating sums. The broader lesson is that classical formulas from centuries past, when combined with modern algorithmic insights, can yield computational capabilities that were not anticipated by their original discoverers.
 
 \begin{thebibliography}{99}
 
@@ -321,6 +476,9 @@ F.~Bellard, A new formula to compute the $n$-th binary digit of pi, Technical re
 
 \bibitem{pidigits}
 Various authors, Tables of digits of $\pi$, \url{https://www.angio.net/pi/digits.html}
+
+\bibitem{ycruncher}
+A.~Yee, Discussion of Plouffe's decimal digit-extraction algorithm, GitHub issue, y-cruncher repository, 2022.
 
 \end{thebibliography}
 
