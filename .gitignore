@@ -5,3 +5,5 @@ add.pdf
 *.synctex.gz
 __pycache__/
 .claude/
+machin_digit_extract
+context.txt
